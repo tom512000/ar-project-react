@@ -129,6 +129,19 @@ export default function App() {
 				setIsARSupported(supported);
 				if (supported) {
 					setStatus('ready');
+					
+					// Test des types de référence d'espace supportés
+					navigator.xr?.requestSession("immersive-ar").then(session => {
+						["local", "local-floor", "viewer"].forEach(type => {
+							session.requestReferenceSpace(type as XRReferenceSpaceType)
+								.then(() => console.log("supported:", type))
+								.catch(() => console.log("NOT supported:", type));
+						});
+						// Fermer la session de test
+						session.end();
+					}).catch(err => {
+						console.error("Erreur lors du test des reference spaces:", err);
+					});
 				} else {
 					setStatus('ar-not-supported');
 				}
@@ -177,23 +190,39 @@ export default function App() {
 	// Démarrer la session AR
 	async function startAR() {
 		if (!rendererRef.current || !navigator.xr) return;
-		
+
 		try {
 			console.log('Démarrage de la session AR...');
-			
-			// Configuration minimale absolue
-			const session = await navigator.xr.requestSession('immersive-ar');
-			console.log('Session AR obtenue:', session);
-			
+
+			const session = await navigator.xr.requestSession('immersive-ar', {
+			optionalFeatures: [
+				"local-floor",
+				"local",
+				"viewer",
+				"hit-test",
+				"dom-overlay",
+			],
+			domOverlay: { root: document.body }
+			});
+
 			await rendererRef.current.xr.setSession(session);
-			console.log('Session configurée dans Three.js');
-			
+
+			// Force une référence compatible
+			let refSpace = null;
+			try {
+			refSpace = await session.requestReferenceSpace("local-floor");
+			console.log("[WebXR] ReferenceSpace = local-floor");
+			} catch (err) {
+			console.warn("[WebXR] local-floor non supporté → fallback local");
+			refSpace = await session.requestReferenceSpace("local");
+			console.log("[WebXR] ReferenceSpace = local");
+			}
+
+			rendererRef.current.xr.setReferenceSpace(refSpace);
+
 		} catch (error: any) {
-			console.error('Erreur complète:', error);
-			console.error('Nom:', error.name);
-			console.error('Message:', error.message);
-			console.error('Stack:', error.stack);
-			setStatus('error: ' + (error?.message || String(error)));
+			console.error(error);
+			setStatus(`error: ${error.message}`);
 		}
 	}
 

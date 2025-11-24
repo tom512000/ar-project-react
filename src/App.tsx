@@ -26,37 +26,35 @@ export default function App() {
 	const xrSessionRef = useRef(null);
 	const [status, setStatus] = useState("idle");
 	const [helpOpen, setHelpOpen] = useState(false);
-	const [placedObject, setPlacedObject] = useState<any>(null);
 	const [isARSupported, setIsARSupported] = useState(false);
-	const gestureState: any = useRef({});
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
-	function createMuseumObject() {
-		const group = new THREE.Group();
+	// function createMuseumObject() {
+	// 	const group = new THREE.Group();
 
-		const baseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 32);
-		const baseMat = new THREE.MeshStandardMaterial({ metalness: 0.2, roughness: 0.6 });
-		const base = new THREE.Mesh(baseGeo, baseMat);
-		base.position.y = 0.01;
-		group.add(base);
+	// 	const baseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 32);
+	// 	const baseMat = new THREE.MeshStandardMaterial({ metalness: 0.2, roughness: 0.6 });
+	// 	const base = new THREE.Mesh(baseGeo, baseMat);
+	// 	base.position.y = 0.01;
+	// 	group.add(base);
 
-		const artGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
-		const artMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-		const art = new THREE.Mesh(artGeo, artMat);
-		art.position.y = 0.12;
-		group.add(art);
+	// 	const artGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
+	// 	const artMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+	// 	const art = new THREE.Mesh(artGeo, artMat);
+	// 	art.position.y = 0.12;
+	// 	group.add(art);
 
-		// small label panel
-		const labelGeo = new THREE.PlaneGeometry(0.16, 0.05);
-		const labelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
-		const label = new THREE.Mesh(labelGeo, labelMat);
-		label.position.set(0, 0.05, 0.08);
-		label.rotation.x = -0.3;
-		group.add(label);
+	// 	// small label panel
+	// 	const labelGeo = new THREE.PlaneGeometry(0.16, 0.05);
+	// 	const labelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+	// 	const label = new THREE.Mesh(labelGeo, labelMat);
+	// 	label.position.set(0, 0.05, 0.08);
+	// 	label.rotation.x = -0.3;
+	// 	group.add(label);
 
-		group.scale.set(1, 1, 1);
-		return group;
-	}
+	// 	group.scale.set(1, 1, 1);
+	// 	return group;
+	// }
 
 	useEffect(() => {
 		const mount: any = mountRef.current;
@@ -214,7 +212,6 @@ export default function App() {
 				if (Array.isArray(o.material)) o.material.forEach((m: any) => m.dispose()); else o.material.dispose();
 			}
 		});
-		setPlacedObject(null);
 		setStatus('reset');
 	}
 

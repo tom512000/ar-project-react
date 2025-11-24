@@ -23,38 +23,80 @@ export default function App() {
 	const cameraRef: any = useRef(null);
 	const sceneRef: any = useRef(null);
 	const reticleRef: any = useRef(null);
-	const xrSessionRef = useRef(null);
+	const xrSessionRef: any = useRef(null);
+	const hitTestSourceRef: any = useRef(null);
+	const placedObjectsRef: any = useRef([]);
+	const xrRefSpaceRef: any = useRef(null);
+	const lightProbeRef: any = useRef(null);
+	const directionalLightRef: any = useRef(null);
+	const trackedImagesRef: any = useRef(new Map());
+	
+	// Gestion des interactions tactiles
+	const touchStateRef: any = useRef({
+		isTouching: false,
+		touchStart: null,
+		lastTouches: [],
+		selectedObject: null,
+		lastDistance: 0,
+		lastAngle: 0
+	});
+
 	const [status, setStatus] = useState("idle");
 	const [helpOpen, setHelpOpen] = useState(false);
 	const [isARSupported, setIsARSupported] = useState(false);
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
-	// function createMuseumObject() {
-	// 	const group = new THREE.Group();
+	function createMuseumObject() {
+		const group = new THREE.Group();
+		group.userData.draggable = true;
 
-	// 	const baseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 32);
-	// 	const baseMat = new THREE.MeshStandardMaterial({ metalness: 0.2, roughness: 0.6 });
-	// 	const base = new THREE.Mesh(baseGeo, baseMat);
-	// 	base.position.y = 0.01;
-	// 	group.add(base);
+		const baseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 32);
+		const baseMat = new THREE.MeshStandardMaterial({ metalness: 0.2, roughness: 0.6 });
+		const base = new THREE.Mesh(baseGeo, baseMat);
+		base.position.y = 0.01;
+		group.add(base);
 
-	// 	const artGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
-	// 	const artMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-	// 	const art = new THREE.Mesh(artGeo, artMat);
-	// 	art.position.y = 0.12;
-	// 	group.add(art);
+		const artGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
+		const artMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+		const art = new THREE.Mesh(artGeo, artMat);
+		art.position.y = 0.12;
+		group.add(art);
 
-	// 	// small label panel
-	// 	const labelGeo = new THREE.PlaneGeometry(0.16, 0.05);
-	// 	const labelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
-	// 	const label = new THREE.Mesh(labelGeo, labelMat);
-	// 	label.position.set(0, 0.05, 0.08);
-	// 	label.rotation.x = -0.3;
-	// 	group.add(label);
+		// small label panel
+		const labelGeo = new THREE.PlaneGeometry(0.16, 0.05);
+		const labelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+		const label = new THREE.Mesh(labelGeo, labelMat);
+		label.position.set(0, 0.05, 0.08);
+		label.rotation.x = -0.3;
+		group.add(label);
 
-	// 	group.scale.set(1, 1, 1);
-	// 	return group;
-	// }
+		group.scale.set(1, 1, 1);
+		return group;
+	}
+
+	// Créer un objet contextuel pour l'image tracking
+	function createContextualContent() {
+		const group = new THREE.Group();
+		
+		// Panneau d'information
+		const panelGeo = new THREE.PlaneGeometry(0.3, 0.2);
+		const panelMat = new THREE.MeshStandardMaterial({ 
+			color: 0x00aaff, 
+			opacity: 0.9, 
+			transparent: true 
+		});
+		const panel = new THREE.Mesh(panelGeo, panelMat);
+		group.add(panel);
+
+		// Bordure
+		const edges = new THREE.EdgesGeometry(panelGeo);
+		const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+		const border = new THREE.LineSegments(edges, lineMat);
+		group.add(border);
+
+		group.scale.set(1, 1, 1);
+		return group;
+	}
 
 	useEffect(() => {
 		const mount: any = mountRef.current;
@@ -86,6 +128,7 @@ export default function App() {
 		const dir = new THREE.DirectionalLight(0xffffff, 0.6);
 		dir.position.set(0.5, 2, 0.5);
 		scene.add(dir);
+		directionalLightRef.current = dir;
 
 		// Reticle for placement (a ring that sits on detected surfaces)
 		const ringGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
@@ -108,12 +151,88 @@ export default function App() {
 		window.addEventListener("resize", onResize);
 
 		// XR animation loop
-		function render(_timestamp: number, _frame: any) {
+		function render(_timestamp: number, frame: any) {
 			// simple pulse effect on reticle when visible
 			if (reticle.visible) {
 				const t = clock.getElapsedTime();
 				const scale = 1 + 0.05 * Math.sin(t * 3);
 				reticle.scale.set(scale, scale, scale);
+			}
+
+			// Hit-test pour positionner le reticle
+			if (frame && xrSessionRef.current) {
+				const session = xrSessionRef.current;
+				const referenceSpace = xrRefSpaceRef.current;
+
+				// Hit-test pour la détection de surface
+				if (hitTestSourceRef.current && referenceSpace) {
+					const hitTestResults = frame.getHitTestResults(hitTestSourceRef.current);
+					if (hitTestResults.length > 0) {
+						const hit = hitTestResults[0];
+						const pose = hit.getPose(referenceSpace);
+						if (pose) {
+							reticle.visible = true;
+							reticle.matrix.fromArray(pose.transform.matrix);
+						}
+					} else {
+						reticle.visible = false;
+					}
+				}
+
+				// Light estimation
+				const lightEstimate = frame.getLightEstimate && frame.getLightEstimate(lightProbeRef.current);
+				if (lightEstimate) {
+					// Adapter l'éclairage directionnel
+					if (lightEstimate.primaryLightDirection && lightEstimate.primaryLightIntensity) {
+						const dir = directionalLightRef.current;
+						if (dir) {
+							dir.position.set(
+								lightEstimate.primaryLightDirection.x,
+								lightEstimate.primaryLightDirection.y,
+								lightEstimate.primaryLightDirection.z
+							);
+							dir.intensity = Math.max(0.3, lightEstimate.primaryLightIntensity.x * 2);
+						}
+					}
+				}
+
+				// Image tracking
+				if (session.trackedImageScores) {
+					const results = frame.getImageTrackingResults && frame.getImageTrackingResults();
+					if (results) {
+						results.forEach((result: any) => {
+							const imageIndex = result.index;
+							const trackingState = result.trackingState;
+
+							if (trackingState === 'tracked') {
+								const pose = frame.getPose(result.imageSpace, referenceSpace);
+								if (pose) {
+									let trackedObject = trackedImagesRef.current.get(imageIndex);
+									
+									if (!trackedObject) {
+										// Créer un nouveau contenu contextuel
+										trackedObject = createContextualContent();
+										trackedObject.userData.isTrackedImage = true;
+										scene.add(trackedObject);
+										trackedImagesRef.current.set(imageIndex, trackedObject);
+										console.log(`Image ${imageIndex} détectée - contenu créé`);
+									}
+
+									// Mettre à jour la position
+									trackedObject.visible = true;
+									trackedObject.matrix.fromArray(pose.transform.matrix);
+									trackedObject.matrixAutoUpdate = false;
+								}
+							} else {
+								// Cacher l'objet si le tracking est perdu
+								const trackedObject = trackedImagesRef.current.get(imageIndex);
+								if (trackedObject) {
+									trackedObject.visible = false;
+								}
+							}
+						});
+					}
+				}
 			}
 
 			renderer.render(scene, camera);
@@ -156,22 +275,167 @@ export default function App() {
 		}
 
 		// When a session starts, keep reference
-		function onSessionStart(session: any) {
+		async function onSessionStart(session: any) {
 			console.log('AR Session started:', session);
 			xrSessionRef.current = session;
 			setStatus("session-started");
+
+			// Obtenir la référence d'espace
+			try {
+				const refSpace = await session.requestReferenceSpace("local-floor").catch(() => 
+					session.requestReferenceSpace("local")
+				);
+				xrRefSpaceRef.current = refSpace;
+
+				// Initialiser hit-test source
+				const viewerSpace = await session.requestReferenceSpace("viewer");
+				const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+				hitTestSourceRef.current = hitTestSource;
+				console.log("Hit-test source initialisé");
+
+				// Initialiser light probe si disponible
+				if (session.requestLightProbe) {
+					try {
+						const lightProbe = await session.requestLightProbe();
+						lightProbeRef.current = lightProbe;
+						console.log("Light probe initialisé");
+					} catch (err) {
+						console.log("Light probe non supporté");
+					}
+				}
+
+			} catch (err) {
+				console.error("Erreur lors de l'initialisation:", err);
+			}
+
+			// Gestion des événements tactiles pour le placement et la manipulation
+			const canvas = renderer.domElement;
 			
-			// Simple render loop - juste afficher la caméra AR
-			renderer.setAnimationLoop(() => {
-				renderer.render(scene, camera);
-			});
+			function onSelect() {
+				if (!reticle.visible) return;
+
+				// Placer un objet au niveau du reticle
+				const newObject = createMuseumObject();
+				newObject.position.setFromMatrixPosition(reticle.matrix);
+				newObject.matrixAutoUpdate = true;
+				scene.add(newObject);
+				placedObjectsRef.current.push(newObject);
+				console.log("Objet placé:", placedObjectsRef.current.length);
+			}
+
+			function onTouchStart(event: TouchEvent) {
+				const touches = Array.from(event.touches);
+				touchStateRef.current.lastTouches = touches;
+				touchStateRef.current.isTouching = true;
+
+				if (touches.length === 1) {
+					// Sélection d'objet
+					const touch = touches[0];
+					const mouse = new THREE.Vector2(
+						(touch.clientX / window.innerWidth) * 2 - 1,
+						-(touch.clientY / window.innerHeight) * 2 + 1
+					);
+
+					const raycaster = new THREE.Raycaster();
+					raycaster.setFromCamera(mouse, camera);
+
+					const draggableObjects = placedObjectsRef.current.filter((obj: any) => obj.userData.draggable);
+					const intersects = raycaster.intersectObjects(draggableObjects, true);
+
+					if (intersects.length > 0) {
+						let selected = intersects[0].object;
+						while (selected.parent && !selected.userData.draggable) {
+							selected = selected.parent;
+						}
+						if (selected.userData.draggable) {
+							touchStateRef.current.selectedObject = selected;
+							touchStateRef.current.touchStart = { x: touch.clientX, y: touch.clientY };
+							event.preventDefault();
+						}
+					}
+				} else if (touches.length === 2) {
+					// Initialiser pinch et rotation
+					const dx = touches[1].clientX - touches[0].clientX;
+					const dy = touches[1].clientY - touches[0].clientY;
+					touchStateRef.current.lastDistance = Math.sqrt(dx * dx + dy * dy);
+					touchStateRef.current.lastAngle = Math.atan2(dy, dx);
+					event.preventDefault();
+				}
+			}
+
+			function onTouchMove(event: TouchEvent) {
+				if (!touchStateRef.current.isTouching) return;
+				const touches = Array.from(event.touches);
+
+				if (touches.length === 1 && touchStateRef.current.selectedObject && touchStateRef.current.touchStart) {
+					// Drag
+					const touch = touches[0];
+					const deltaX = (touch.clientX - touchStateRef.current.touchStart.x) * 0.001;
+					const deltaY = (touch.clientY - touchStateRef.current.touchStart.y) * 0.001;
+					
+					touchStateRef.current.selectedObject.position.x += deltaX;
+					touchStateRef.current.selectedObject.position.z += deltaY;
+					
+					touchStateRef.current.touchStart = { x: touch.clientX, y: touch.clientY };
+					event.preventDefault();
+				} else if (touches.length === 2 && touchStateRef.current.selectedObject) {
+					// Pinch to scale
+					const dx = touches[1].clientX - touches[0].clientX;
+					const dy = touches[1].clientY - touches[0].clientY;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+					
+					if (touchStateRef.current.lastDistance > 0) {
+						const scaleFactor = distance / touchStateRef.current.lastDistance;
+						const newScale = touchStateRef.current.selectedObject.scale.x * scaleFactor;
+						const clampedScale = Math.max(0.5, Math.min(3, newScale));
+						touchStateRef.current.selectedObject.scale.setScalar(clampedScale);
+					}
+					touchStateRef.current.lastDistance = distance;
+
+					// Rotation avec deux doigts
+					const angle = Math.atan2(dy, dx);
+					if (touchStateRef.current.lastAngle !== 0) {
+						const deltaAngle = angle - touchStateRef.current.lastAngle;
+						touchStateRef.current.selectedObject.rotation.y += deltaAngle;
+					}
+					touchStateRef.current.lastAngle = angle;
+
+					event.preventDefault();
+				}
+
+				touchStateRef.current.lastTouches = touches;
+			}
+
+			function onTouchEnd(event: TouchEvent) {
+				if (event.touches.length === 0) {
+					touchStateRef.current.isTouching = false;
+					touchStateRef.current.selectedObject = null;
+					touchStateRef.current.touchStart = null;
+					touchStateRef.current.lastDistance = 0;
+					touchStateRef.current.lastAngle = 0;
+				}
+				touchStateRef.current.lastTouches = Array.from(event.touches);
+			}
+
+			session.addEventListener("select", onSelect);
+			canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+			canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+			canvas.addEventListener("touchend", onTouchEnd);
+			canvas.addEventListener("touchcancel", onTouchEnd);
 
 			session.addEventListener("end", () => {
 				xrSessionRef.current = null;
+				hitTestSourceRef.current = null;
+				lightProbeRef.current = null;
+				xrRefSpaceRef.current = null;
 				setStatus("session-ended");
 				reticle.visible = false;
-				// Restaurer la boucle normale
-				renderer.setAnimationLoop(render);
+				
+				// Nettoyer les événements
+				canvas.removeEventListener("touchstart", onTouchStart);
+				canvas.removeEventListener("touchmove", onTouchMove);
+				canvas.removeEventListener("touchend", onTouchEnd);
+				canvas.removeEventListener("touchcancel", onTouchEnd);
 			});
 		}
 
@@ -194,31 +458,52 @@ export default function App() {
 		try {
 			console.log('Démarrage de la session AR...');
 
-			const session = await navigator.xr.requestSession('immersive-ar', {
-			optionalFeatures: [
-				"local-floor",
-				"local",
-				"viewer",
-				"hit-test",
-				"dom-overlay",
-			],
-			domOverlay: { root: document.body }
-			});
+			// Créer une image de référence pour le tracking (exemple avec une URL d'image)
+			// Note: En production, remplacer par une vraie image de référence
+			const trackedImages: any[] = [];
+			
+			// Vous pouvez ajouter des images de référence ici
+			// Exemple: créer un bitmap à partir d'une URL
+			const img = await fetch('image.jpg').then(r => r.blob());
+			const bitmap = await createImageBitmap(img);
+			trackedImages.push({ image: bitmap, widthInMeters: 0.2 });
+
+			const sessionInit: any = {
+				requiredFeatures: ["local-floor"],
+				optionalFeatures: [
+					"local",
+					"viewer",
+					"hit-test",
+					"dom-overlay",
+					"light-estimation",
+				],
+				domOverlay: { root: document.body }
+			};
+
+			// Ajouter image-tracking si des images sont disponibles
+			if (trackedImages.length > 0) {
+				sessionInit.optionalFeatures.push("image-tracking");
+				sessionInit.trackedImages = trackedImages;
+			}
+
+			const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
 
 			await rendererRef.current.xr.setSession(session);
 
 			// Force une référence compatible
 			let refSpace = null;
 			try {
-			refSpace = await session.requestReferenceSpace("local-floor");
-			console.log("[WebXR] ReferenceSpace = local-floor");
+				refSpace = await session.requestReferenceSpace("local-floor");
+				console.log("[WebXR] ReferenceSpace = local-floor");
 			} catch (err) {
-			console.warn("[WebXR] local-floor non supporté → fallback local");
-			refSpace = await session.requestReferenceSpace("local");
-			console.log("[WebXR] ReferenceSpace = local");
+				console.warn("[WebXR] local-floor non supporté → fallback local");
+				refSpace = await session.requestReferenceSpace("local");
+				console.log("[WebXR] ReferenceSpace = local");
 			}
 
 			rendererRef.current.xr.setReferenceSpace(refSpace);
+
+			setStatus("ar-running");
 
 		} catch (error: any) {
 			console.error(error);
@@ -230,18 +515,41 @@ export default function App() {
 	function handleReset() {
 		const scene = sceneRef.current;
 		if (!scene) return;
-		const toRemove: any[] = [];
-		scene.traverse((c: any) => {
-			if (c.isMesh && c.name !== 'Reticle') toRemove.push(c);
-		});
-		toRemove.forEach((o) => {
-			if (o.parent) o.parent.remove(o);
-			if (o.geometry) o.geometry.dispose();
-			if (o.material) {
-				if (Array.isArray(o.material)) o.material.forEach((m: any) => m.dispose()); else o.material.dispose();
+		
+		// Supprimer les objets placés
+		placedObjectsRef.current.forEach((obj: any) => {
+			scene.remove(obj);
+			if (obj.geometry) obj.geometry.dispose();
+			if (obj.material) {
+				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose()); 
+				else obj.material.dispose();
 			}
 		});
+		placedObjectsRef.current = [];
+
+		// Supprimer les objets trackés
+		trackedImagesRef.current.forEach((obj: any) => {
+			scene.remove(obj);
+			if (obj.geometry) obj.geometry.dispose();
+			if (obj.material) {
+				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose()); 
+				else obj.material.dispose();
+			}
+		});
+		trackedImagesRef.current.clear();
+
+		// Réinitialiser l'état tactile
+		touchStateRef.current = {
+			isTouching: false,
+			touchStart: null,
+			lastTouches: [],
+			selectedObject: null,
+			lastDistance: 0,
+			lastAngle: 0
+		};
+
 		setStatus('reset');
+		console.log("Scène réinitialisée");
 	}
 
 	return (

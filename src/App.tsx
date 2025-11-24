@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // AR-Museum-Experience
 // Single-file React component that sets up a simple AR experience with three.js + WebXR.
@@ -26,8 +25,9 @@ export default function App() {
 	const reticleRef: any = useRef(null);
 	const xrSessionRef = useRef(null);
 	const [status, setStatus] = useState("idle");
-	const [helpOpen, setHelpOpen] = useState(true);
+	const [helpOpen, setHelpOpen] = useState(false);
 	const [placedObject, setPlacedObject] = useState<any>(null);
+	const [isARSupported, setIsARSupported] = useState(false);
 	const gestureState: any = useRef({});
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
@@ -66,9 +66,15 @@ export default function App() {
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.xr.enabled = true;
-		renderer.setAnimationLoop(() => {}); // set later
 		mount.appendChild(renderer.domElement);
 		rendererRef.current = renderer;
+		
+		// Style pour assurer la visibilité du canvas
+		renderer.domElement.style.position = 'absolute';
+		renderer.domElement.style.top = '0';
+		renderer.domElement.style.left = '0';
+		renderer.domElement.style.width = '100%';
+		renderer.domElement.style.height = '100%';
 
 		const scene = new THREE.Scene();
 		sceneRef.current = scene;
@@ -104,7 +110,7 @@ export default function App() {
 		window.addEventListener("resize", onResize);
 
 		// XR animation loop
-		function render() {
+		function render(_timestamp: number, _frame: any) {
 			// simple pulse effect on reticle when visible
 			if (reticle.visible) {
 				const t = clock.getElapsedTime();
@@ -117,116 +123,35 @@ export default function App() {
 
 		renderer.setAnimationLoop(render);
 
-		// Start button using three.js ARButton
-		const arButton = ARButton.createButton(renderer, {
-			requiredFeatures: ["hit-test"],
-			optionalFeatures: ["dom-overlay", "light-estimation", "image-tracking", "planes"],
-		});
-		// Attach the ARButton to the DOM in a readable place
-		arButton.style.position = "absolute";
-		arButton.style.bottom = "20px";
-		arButton.style.left = "20px";
-		mount.appendChild(arButton);
+		// Vérifier si WebXR AR est supporté
+		if (navigator.xr) {
+			navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+				console.log('WebXR AR supporté:', supported);
+				console.log('User Agent:', navigator.userAgent);
+				setIsARSupported(supported);
+				if (supported) {
+					setStatus('ready');
+				} else {
+					setStatus('ar-not-supported');
+				}
+			}).catch((err) => {
+				console.error('Erreur vérification WebXR:', err);
+				setStatus('ar-not-supported');
+			});
+		} else {
+			console.log('navigator.xr non disponible');
+			console.log('User Agent:', navigator.userAgent);
+			setStatus('webxr-not-available');
+		}
 
 		// When a session starts, keep reference
 		function onSessionStart(session: any) {
+			console.log('AR Session started:', session);
 			xrSessionRef.current = session;
 			setStatus("session-started");
-
-			// if light probe available, attempt to create one
-			(async () => {
-				try {
-					if (session.requestLightProbe) {
-						const probe = await session.requestLightProbe();
-						// note: three.js does not automatically integrate; you'd sample probe reflections
-						// placeholder: we just set a little extra intensity on directional light
-						probe.addEventListener && probe.addEventListener("reflectionchange", () => {
-							dir.intensity = 0.8;
-						});
-					}
-				} catch (e) {
-					// feature not available or denied; ignore
-				}
-			})();
-
-			// Setup image tracking if available
-			if (session.updateTargetImages) {
-				// NOTE: this block uses the (experimental) WebXR Image Tracking API.
-				// You must provide images as ImageBitmap with physicalWidth in meters.
-				// We'll attempt to fetch an example image and register it.
-				(async () => {
-					try {
-						const resp = await fetch("/assets/marker.jpg"); // developer should include marker.jpg
-						const blob = await resp.blob();
-						const bitmap = await createImageBitmap(blob);
-						// inform the session about target images
-						// This API shape may vary between browsers; this is a best-effort example
-						const tracked = [{ image: bitmap, widthInMeters: 0.2, id: "poster1" }];
-						await session.updateTargetImages(tracked);
-						console.log("Image tracking configured");
-					} catch (err) {
-						console.warn("Unable to setup image tracking:", err);
-					}
-				})();
-			}
-
-			// create a hit-test source for placing objects on planes
-			let viewerSpace = null;
-			let hitTestSource: any = null;
-
-			(async () => {
-				try {
-					viewerSpace = await session.requestReferenceSpace("viewer");
-					hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-				} catch (err) {
-					console.warn("Hit test not available", err);
-				}
-			})();
-
-			// Listen to XRFrame events via requestAnimationFrame inside render loop
-			renderer.setAnimationLoop((xrFrame: any) => {
-				if (xrFrame && hitTestSource) {
-					const referenceSpace: any = renderer.xr.getReferenceSpace();
-					const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
-					if (hitTestResults.length > 0) {
-						const hit = hitTestResults[0];
-						const pose = hit.getPose(referenceSpace);
-						reticle.visible = true;
-						reticle.matrix.fromArray(pose.transform.matrix);
-					} else {
-						reticle.visible = false;
-					}
-				}
-
-				// Image tracking event handling (experimental)
-				if (xrFrame && xrFrame.getImageTrackingResults) {
-					const results = xrFrame.getImageTrackingResults();
-					for (const result of results) {
-						// result.index, result.imageSpace, result.trackingState
-						const state = result.trackingState; // 'tracked' | 'emulated' | 'not-tracked'
-						// When tracked, we can get its pose
-						if (state === 'tracked') {
-							const imagePose = xrFrame.getPose(result.imageSpace, renderer.xr.getReferenceSpace());
-							if (imagePose) {
-								// create or update contextual 3D content anchored to the marker
-								let markerObject = scene.getObjectByName(`marker-${result.index}`);
-								if (!markerObject) {
-									markerObject = createMuseumObject();
-									markerObject.name = `marker-${result.index}`;
-									scene.add(markerObject);
-								}
-								markerObject.matrixAutoUpdate = false;
-								markerObject.matrix.fromArray(imagePose.transform.matrix);
-								markerObject.visible = true;
-							}
-						} else {
-							// hide contextual content when not tracked (design choice: hide)
-							const markerObject = scene.getObjectByName(`marker-${result.index}`);
-							if (markerObject) markerObject.visible = false;
-						}
-					}
-				}
-
+			
+			// Simple render loop - juste afficher la caméra AR
+			renderer.setAnimationLoop(() => {
 				renderer.render(scene, camera);
 			});
 
@@ -234,106 +159,45 @@ export default function App() {
 				xrSessionRef.current = null;
 				setStatus("session-ended");
 				reticle.visible = false;
-			});
-
-			// Basic pointer-based gestures for placed object (works outside immersive session too)
-			let active = false;
-			let lastPointers: any = {};
-
-			function onPointerDown(e: any) {
-				active = true;
-				lastPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-			}
-			function onPointerMove(e: any) {
-				if (!active) return;
-				// multi-touch gestures
-				lastPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
-
-				const ids = Object.keys(lastPointers);
-				if (!placedObject) return;
-
-				if (ids.length === 1) {
-					// single-finger drag -> translate object along camera plane
-					// const p = lastPointers[ids[0]];
-					// simple translation mapping (not physically accurate but intuitive)
-					// move object horizontally & vertically relative to camera
-					const dx = (e.movementX || 0) / window.innerWidth;
-					const dy = (e.movementY || 0) / window.innerHeight;
-					placedObject.position.x += dx * 0.5;
-					placedObject.position.y -= dy * 0.5;
-				} else if (ids.length === 2) {
-					// two-finger: pinch to scale, rotation by angle difference
-					const p1 = lastPointers[ids[0]];
-					const p2 = lastPointers[ids[1]];
-					const curDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-					if (!gestureState.current.startDist) gestureState.current.startDist = curDist;
-					const scaleFactor = curDist / gestureState.current.startDist;
-					placedObject.scale.setScalar(gestureState.current.startScale * scaleFactor);
-
-					// rotation: compute angle between the two pointers
-					const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-					if (!gestureState.current.startAngle) gestureState.current.startAngle = angle;
-					const delta = angle - gestureState.current.startAngle;
-					placedObject.rotation.y = gestureState.current.startRotationY + delta;
-				}
-			}
-			function onPointerUp(e: any) {
-				delete lastPointers[e.pointerId];
-				if (Object.keys(lastPointers).length === 0) {
-					active = false;
-					gestureState.current = {};
-				} else if (Object.keys(lastPointers).length === 1) {
-					// preserve current scale/rotation
-					gestureState.current.startScale = placedObject ? placedObject.scale.x : 1;
-					gestureState.current.startRotationY = placedObject ? placedObject.rotation.y : 0;
-				}
-			}
-
-			window.addEventListener("pointerdown", onPointerDown);
-			window.addEventListener("pointermove", onPointerMove);
-			window.addEventListener("pointerup", onPointerUp);
-
-			// Place object when user taps screen and reticle visible
-			function onSelect() {
-				if (reticle.visible) {
-					const obj = createMuseumObject();
-					// position object according to reticle
-					obj.matrixAutoUpdate = false;
-					obj.matrix.copy(reticle.matrix);
-					// compute position from matrix
-					obj.position.setFromMatrixPosition(reticle.matrix);
-					obj.matrixAutoUpdate = true;
-					scene.add(obj);
-					setPlacedObject(obj);
-					setStatus("placed");
-				}
-			}
-
-			session.addEventListener("select", onSelect);
-
-			// cleanup when session ends
-			session.addEventListener("end", () => {
-				window.removeEventListener("pointerdown", onPointerDown);
-				window.removeEventListener("pointermove", onPointerMove);
-				window.removeEventListener("pointerup", onPointerUp);
+				// Restaurer la boucle normale
+				renderer.setAnimationLoop(render);
 			});
 		}
 
-		// Listen to ARButton session events
+		// Listen to XR session events
 		renderer.xr.addEventListener("sessionstart", () => onSessionStart(renderer.xr.getSession()));
 
-		// initial status
-		setStatus("ready");
-
 		// cleanup on unmount
-		return () => {
+			return () => {
 			window.removeEventListener("resize", onResize);
 			renderer.setAnimationLoop(null);
 			if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
-			if (arButton && arButton.parentNode) arButton.parentNode.removeChild(arButton);
 			renderer.dispose();
 		};
 	}, []);
+
+	// Démarrer la session AR
+	async function startAR() {
+		if (!rendererRef.current || !navigator.xr) return;
+		
+		try {
+			console.log('Démarrage de la session AR...');
+			
+			// Configuration minimale absolue
+			const session = await navigator.xr.requestSession('immersive-ar');
+			console.log('Session AR obtenue:', session);
+			
+			await rendererRef.current.xr.setSession(session);
+			console.log('Session configurée dans Three.js');
+			
+		} catch (error: any) {
+			console.error('Erreur complète:', error);
+			console.error('Nom:', error.name);
+			console.error('Message:', error.message);
+			console.error('Stack:', error.stack);
+			setStatus('error: ' + (error?.message || String(error)));
+		}
+	}
 
 	// Reset scene: remove placed objects & markers
 	function handleReset() {
@@ -359,20 +223,48 @@ export default function App() {
 			<div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
 			{/* Minimal overlay UI */}
-			<div style={{ position: 'absolute', top: 12, left: 12, color: '#fff', fontFamily: 'sans-serif' }}>
+			<div style={{ position: 'absolute', top: 12, left: 12, color: '#fff', fontFamily: 'sans-serif', pointerEvents: 'none' }}>
 				<div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: 8 }}>
 					<div style={{ fontWeight: '700' }}>AR Museum — Statut: {status}</div>
 					<div style={{ fontSize: 12, opacity: 0.9 }}>Aidez: {helpOpen ? 'visible' : 'cachée'}</div>
 				</div>
 			</div>
 
-			<div style={{ position: 'absolute', right: 12, top: 12 }}>
-				<button onClick={() => setHelpOpen(h => !h)} style={{ padding: '8px 10px', borderRadius: 8 }}>Aide</button>
-				<button onClick={handleReset} style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8 }}>Réinitialiser</button>
+			<div style={{ position: 'absolute', right: 12, top: 12, pointerEvents: 'auto', zIndex: 1000 }}>
+				<button onClick={() => setHelpOpen(h => !h)} style={{ padding: '8px 10px', borderRadius: 8, pointerEvents: 'auto' }}>Aide</button>
+				<button onClick={handleReset} style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}>Réinitialiser</button>
 			</div>
 
+			{/* Bouton START AR au centre */}
+			{isARSupported && status === 'ready' && (
+				<div style={{ position: 'absolute', bottom: '20%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', zIndex: 1001 }}>
+					<button 
+						onClick={startAR}
+						style={{ 
+							padding: '16px 40px', 
+							fontSize: '18px',
+							fontWeight: 'bold',
+							borderRadius: 12, 
+							background: '#00ffcc',
+							color: '#000',
+							border: 'none',
+							cursor: 'pointer',
+							boxShadow: '0 4px 12px rgba(0,255,204,0.4)'
+						}}
+					>
+						START AR
+					</button>
+				</div>
+			)}
+
+			{!isARSupported && status !== 'idle' && (
+				<div style={{ position: 'absolute', bottom: '20%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 1001, background: 'rgba(255,0,0,0.7)', color: '#fff', padding: '12px 24px', borderRadius: 8 }}>
+					AR non supporté sur cet appareil
+				</div>
+			)}
+
 			{helpOpen && (
-				<div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 90, background: 'rgba(0,0,0,0.6)', color: '#fff', padding: 12, borderRadius: 8, maxWidth: 420 }}>
+				<div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 90, background: 'rgba(0,0,0,0.8)', color: '#fff', padding: 12, borderRadius: 8, maxWidth: 420, pointerEvents: 'none', zIndex: 999 }}>
 					<div style={{ fontWeight: 700 }}>Mode d'emploi rapide</div>
 					<ul style={{ fontSize: 13 }}>
 						<li>Autorisez l'accès à la caméra.</li>

@@ -32,6 +32,7 @@ export default function App() {
 	const directionalLightRef: any = useRef(null);
 	const trackedImagesRef: any = useRef(new Map());
 	const gltfLoaderRef: any = useRef(null);
+	const blockPlacementRef: any = useRef(false);
 	
 	// Gestion des interactions tactiles
 	const touchStateRef: any = useRef({
@@ -337,6 +338,13 @@ export default function App() {
 			const canvas = renderer.domElement;
 			
 			function onSelect() {
+				// Ne pas placer d'objet si le placement est bloqué
+				if (blockPlacementRef.current) {
+					console.log("Placement bloqué (interaction UI)");
+					blockPlacementRef.current = false;
+					return;
+				}
+				
 				if (!reticle.visible) return;
 
 				// Placer un objet au niveau du reticle
@@ -356,6 +364,14 @@ export default function App() {
 			}
 
 			function onTouchStart(event: TouchEvent) {
+				// Vérifier si le touch est sur un élément UI
+				const target = event.target as HTMLElement;
+				if (target && (target.tagName === 'BUTTON' || target.closest('button'))) {
+					blockPlacementRef.current = true;
+					console.log("UI touché - placement bloqué");
+					return;
+				}
+				
 				const touches = Array.from(event.touches);
 				touchStateRef.current.lastTouches = touches;
 				touchStateRef.current.isTouching = true;
@@ -544,7 +560,13 @@ export default function App() {
 	}
 
 	// Reset scene: remove placed objects & markers
-	function handleReset() {
+	function handleReset(event?: any) {
+		// Empêcher la propagation pour éviter de déclencher un placement
+		if (event) {
+			event.preventDefault();
+			event.stopPropagation();
+		}
+		
 		const scene = sceneRef.current;
 		if (!scene) return;
 		
@@ -597,8 +619,42 @@ export default function App() {
 			</div>
 
 			<div style={{ position: 'absolute', right: 12, top: 12, pointerEvents: 'auto', zIndex: 1000 }}>
-				<button onClick={() => setHelpOpen(h => !h)} style={{ padding: '8px 10px', borderRadius: 8, pointerEvents: 'auto' }}>Aide</button>
-				<button onClick={handleReset} style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}>Réinitialiser</button>
+				<button 
+					onClick={(e) => { 
+						e.stopPropagation(); 
+						blockPlacementRef.current = true;
+						setHelpOpen(h => !h); 
+					}} 
+					onPointerDown={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					onTouchStart={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					style={{ padding: '8px 10px', borderRadius: 8, pointerEvents: 'auto' }}
+				>
+					Aide
+				</button>
+				<button 
+					onClick={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+						handleReset();
+					}} 
+					onPointerDown={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					onTouchStart={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}
+				>
+					Réinitialiser
+				</button>
 			</div>
 
 			{/* Bouton START AR au centre */}

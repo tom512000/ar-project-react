@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 // AR-Museum-Experience
 // Single-file React component that sets up a simple AR experience with three.js + WebXR.
@@ -30,6 +31,7 @@ export default function App() {
 	const lightProbeRef: any = useRef(null);
 	const directionalLightRef: any = useRef(null);
 	const trackedImagesRef: any = useRef(new Map());
+	const gltfLoaderRef: any = useRef(null);
 	
 	// Gestion des interactions tactiles
 	const touchStateRef: any = useRef({
@@ -46,31 +48,51 @@ export default function App() {
 	const [isARSupported, setIsARSupported] = useState(false);
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
-	function createMuseumObject() {
+	function createMuseumObject(callback: (group: THREE.Group) => void) {
 		const group = new THREE.Group();
 		group.userData.draggable = true;
 
-		const baseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 32);
-		const baseMat = new THREE.MeshStandardMaterial({ metalness: 0.2, roughness: 0.6 });
-		const base = new THREE.Mesh(baseGeo, baseMat);
-		base.position.y = 0.01;
-		group.add(base);
-
-		const artGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
-		const artMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-		const art = new THREE.Mesh(artGeo, artMat);
-		art.position.y = 0.12;
-		group.add(art);
-
-		// small label panel
-		const labelGeo = new THREE.PlaneGeometry(0.16, 0.05);
-		const labelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
-		const label = new THREE.Mesh(labelGeo, labelMat);
-		label.position.set(0, 0.05, 0.08);
-		label.rotation.x = -0.3;
-		group.add(label);
-
-		group.scale.set(1, 1, 1);
+		// Charger le modèle GLTF
+		if (gltfLoaderRef.current) {
+			gltfLoaderRef.current.load(
+				'/models/nefertitis/scene.gltf',
+				(gltf: any) => {
+					const model = gltf.scene;
+					
+					// Ajuster la taille du modèle AVANT de calculer la bounding box
+					model.scale.set(1, 1, 1);
+					model.updateMatrixWorld(true);
+					
+					// Calculer la bounding box après le scaling
+					const box = new THREE.Box3().setFromObject(model);
+					const center = box.getCenter(new THREE.Vector3());
+					// const size = box.getSize(new THREE.Vector3());
+					
+					// Repositionner le modèle pour que sa base soit à Y=0
+					// et qu'il soit centré en X et Z
+					model.position.set(
+						-center.x,
+						-box.min.y,  // Aligner la base du modèle à Y=0
+						-center.z
+					);
+					
+					// Ajouter au groupe
+					group.add(model);
+					callback(group);
+				},
+				undefined,
+				(error: any) => {
+					console.error('Erreur chargement GLTF:', error);
+					// Fallback: créer un objet simple en cas d'erreur
+					const fallbackGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+					const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+					const fallback = new THREE.Mesh(fallbackGeo, fallbackMat);
+					group.add(fallback);
+					callback(group);
+				}
+			);
+		}
+		
 		return group;
 	}
 
@@ -101,6 +123,9 @@ export default function App() {
 	useEffect(() => {
 		const mount: any = mountRef.current;
 		if (!mount) return;
+
+		// Initialiser le GLTF Loader
+		gltfLoaderRef.current = new GLTFLoader();
 
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 		renderer.setPixelRatio(window.devicePixelRatio);
@@ -315,12 +340,19 @@ export default function App() {
 				if (!reticle.visible) return;
 
 				// Placer un objet au niveau du reticle
-				const newObject = createMuseumObject();
-				newObject.position.setFromMatrixPosition(reticle.matrix);
-				newObject.matrixAutoUpdate = true;
-				scene.add(newObject);
-				placedObjectsRef.current.push(newObject);
-				console.log("Objet placé:", placedObjectsRef.current.length);
+				createMuseumObject((newObject) => {
+					// Extraire seulement la position du reticle (pas toute la matrice)
+					const reticlePosition = new THREE.Vector3();
+					reticlePosition.setFromMatrixPosition(reticle.matrix);
+					
+					// Placer l'objet à cette position exacte
+					newObject.position.copy(reticlePosition);
+					newObject.matrixAutoUpdate = true;
+					
+					scene.add(newObject);
+					placedObjectsRef.current.push(newObject);
+					console.log("Objet placé:", placedObjectsRef.current.length);
+				});
 			}
 
 			function onTouchStart(event: TouchEvent) {

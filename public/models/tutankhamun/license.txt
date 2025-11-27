@@ -1,0 +1,8 @@
+Model Information:
+* title:	The bust of Pharaoh Tutankhamun
+* source:	https://sketchfab.com/3d-models/the-bust-of-pharaoh-tutankhamun-979585b484bc40d8a57718ea8afb77bd
+* author:	AK STUDIO (https://sketchfab.com/inven2000)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

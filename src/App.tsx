@@ -24,6 +24,7 @@ const AVAILABLE_MODELS = [
 	{ id: 'nefertitis', name: 'Néfertiti', path: '/models/nefertitis/scene.gltf', scale: 1 },
 	{ id: 'cat', name: 'Chat', path: '/models/cat/scene.gltf', scale: 0.5 },
 	{ id: 'scarab', name: 'Scarabée', path: '/models/scarab/scene.gltf', scale: 0.01 },
+	{ id: 'tutankhamun', name: 'Toutankhamon', path: '/models/tutankhamun/scene.gltf', scale: 0.25 },
 ];
 
 // Composant de prévisualisation 3D

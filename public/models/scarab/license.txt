@@ -1,0 +1,11 @@
+Model Information:
+* title:	Giant sculpture of a scarab beetle (update '16)
+* source:	https://sketchfab.com/3d-models/giant-sculpture-of-a-scarab-beetle-update-16-c8a568f1c1a746d4b2939b2f9a46f3d9
+* author:	Thomas Flynn (https://sketchfab.com/nebulousflynn)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Giant sculpture of a scarab beetle (update '16)" (https://sketchfab.com/3d-models/giant-sculpture-of-a-scarab-beetle-update-16-c8a568f1c1a746d4b2939b2f9a46f3d9) by Thomas Flynn (https://sketchfab.com/nebulousflynn) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

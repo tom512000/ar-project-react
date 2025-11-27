@@ -115,6 +115,7 @@ export default function App() {
 	const trackedImagesRef: any = useRef(new Map());
 	const gltfLoaderRef: any = useRef(null);
 	const blockPlacementRef: any = useRef(false);
+	const defaultModelRef: any = useRef(AVAILABLE_MODELS[0]);
 	
 	// Gestion des interactions tactiles
 	const touchStateRef: any = useRef({
@@ -130,6 +131,13 @@ export default function App() {
 	const [helpOpen, setHelpOpen] = useState(false);
 	const [isARSupported, setIsARSupported] = useState(false);
 	const [modalOpen, setModalOpen] = useState(false);
+	const [isSelectingDefault, setIsSelectingDefault] = useState(false);
+	const [defaultModel, setDefaultModel] = useState(AVAILABLE_MODELS[0]);
+
+	// Synchroniser la ref avec le state
+	useEffect(() => {
+		defaultModelRef.current = defaultModel;
+	}, [defaultModel]);
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
 	function createMuseumObject(modelPath: string, modelScale: number, callback: (group: THREE.Group) => void) {
@@ -430,8 +438,9 @@ export default function App() {
 				
 				if (!reticle.visible) return;
 
-				// Ouvrir le modal de sélection
-				setModalOpen(true);
+				// Placer le modèle par défaut
+				const currentModel = defaultModelRef.current;
+				createPlacedObject(currentModel.path, currentModel.scale);
 			}
 
 			function onTouchStart(event: TouchEvent) {
@@ -630,8 +639,8 @@ export default function App() {
 		}
 	}
 
-	// Placer le modèle sélectionné
-	function placeSelectedModel(modelPath: string, modelScale: number) {
+	// Placer un objet à la position du reticle
+	function createPlacedObject(modelPath: string, modelScale: number) {
 		const reticle = reticleRef.current;
 		const scene = sceneRef.current;
 		
@@ -651,6 +660,18 @@ export default function App() {
 			placedObjectsRef.current.push(newObject);
 			console.log("Objet placé:", placedObjectsRef.current.length);
 		});
+	}
+
+	// Gérer la sélection d'un modèle depuis le modal
+	function handleModelSelection(model: typeof AVAILABLE_MODELS[0]) {
+		if (isSelectingDefault) {
+			// Définir comme modèle par défaut
+			setDefaultModel(model);
+			setIsSelectingDefault(false);
+		} else {
+			// Placer le modèle immédiatement
+			createPlacedObject(model.path, model.scale);
+		}
 
 		// Fermer le modal et bloquer temporairement le placement
 		setModalOpen(false);
@@ -742,6 +763,25 @@ export default function App() {
 					onClick={(e) => {
 						e.stopPropagation();
 						blockPlacementRef.current = true;
+						setIsSelectingDefault(true);
+						setModalOpen(true);
+					}} 
+					onPointerDown={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					onTouchStart={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
+					}}
+					style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}
+				>
+					Modèle: {defaultModel.name}
+				</button>
+				<button 
+					onClick={(e) => {
+						e.stopPropagation();
+						blockPlacementRef.current = true;
 						handleReset();
 					}} 
 					onPointerDown={(e) => {
@@ -800,10 +840,11 @@ export default function App() {
 
 			{/* Modal de sélection de modèle */}
 			<Modal
-				title="Choisir un modèle"
+				title={isSelectingDefault ? "Choisir le modèle par défaut" : "Choisir un modèle"}
 				open={modalOpen}
 				onCancel={() => {
 					setModalOpen(false);
+					setIsSelectingDefault(false);
 					blockPlacementRef.current = true;
 					setTimeout(() => {
 						blockPlacementRef.current = false;
@@ -818,8 +859,11 @@ export default function App() {
 						<Col key={model.id} xs={12} sm={12} md={6}>
 							<Card
 								hoverable
-								onClick={() => placeSelectedModel(model.path, model.scale)}
-								style={{ textAlign: 'center' }}
+								onClick={() => handleModelSelection(model)}
+								style={{ 
+									textAlign: 'center',
+									border: defaultModel.id === model.id && isSelectingDefault ? '2px solid #1890ff' : undefined
+								}}
 								cover={
 									<div style={{ 
 										height: 200, 

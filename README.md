@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# AR Project
+Ce projet React utilise Three.js et React Three Fiber pour afficher des modèles 3D en réalité augmentée.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Installation
+1. Clonez le dépôt :
+	```bash
+	git clone https://github.com/tom512000/ar-project-react.git
+	```
 
-Currently, two official plugins are available:
+2. Accédez au répertoire du projet :
+	```bash
+	cd ar-project-react
+	```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+3. Installez les dépendances :
+	```bash
+	npm install
+	```
 
-## React Compiler
+4. Construisez le projet :
+	```bash
+	npm run build
+	```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+5. Lancez le serveur de prévisualisation avec l'option `--host` pour permettre l'accès depuis d'autres appareils sur le même réseau :
+	```bash
+	npm run preview -- --host
+	```
 
-## Expanding the ESLint configuration
+6. Téléchargez et installez ngrok depuis [ngrok.com](https://ngrok.com/), puis exécutez la commande suivante dans une nouvelle fenêtre de terminal :
+	```bash
+	ngrok.exe http 4173
+	```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+7. Utilisez l'URL fournie par ngrok pour accéder à l'application depuis votre appareil mobile.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Utilisation
+- Ouvrez l'application sur votre appareil mobile en utilisant l'URL fournie par ngrok.
+- Autorisez l'accès à la caméra lorsque vous y êtes invité.
+- Pointez la caméra vers une surface plane pour voir le modèle 3D en réalité augmentée.
+- Interagissez avec le modèle 3D en utilisant les contrôles tactiles (zoom, rotation, déplacement).
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Modèles 3D
+Les modèles 3D sont situés dans le répertoire `public/models`. Vous pouvez remplacer les fichiers `.gltf` par vos propres modèles pour personnaliser l'expérience AR.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Technologies utilisées
+- React
+- Three.js
+- React Three Fiber
+- GLTFLoader
+- Vite
+- ngrok

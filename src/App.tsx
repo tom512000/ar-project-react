@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { Modal, Card, Row, Col } from "antd";
 
 // AR-Museum-Experience
 // Single-file React component that sets up a simple AR experience with three.js + WebXR.
@@ -17,6 +18,87 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 //   enabled, or any browser that supports WebXR AR). For image tracking and light estimation, browser
 //   support is still experimental—feature-detect and fall back.
 // - Bundle with Vite / Create React App. Install three: `npm i three`
+
+// Modèles disponibles
+const AVAILABLE_MODELS = [
+	{ id: 'nefertitis', name: 'Néfertiti', path: '/models/nefertitis/scene.gltf', scale: 1 },
+	{ id: 'cat', name: 'Chat', path: '/models/cat/scene.gltf', scale: 0.5 },
+	{ id: 'scarab', name: 'Scarabée', path: '/models/scarab/scene.gltf', scale: 0.01 },
+];
+
+// Composant de prévisualisation 3D
+function ModelPreview({ modelPath }: { modelPath: string }) {
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+
+	useEffect(() => {
+		if (!canvasRef.current) return;
+
+		const canvas = canvasRef.current;
+		const scene = new THREE.Scene();
+		const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+		camera.position.set(0, 0, 3);
+
+		const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+		renderer.setSize(200, 200);
+		renderer.setClearColor(0x000000, 0);
+
+		// Lumière
+		const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+		scene.add(ambientLight);
+		const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(1, 2, 1);
+		scene.add(directionalLight);
+
+		// Charger le modèle
+		const loader = new GLTFLoader();
+		let model: THREE.Group | null = null;
+
+		loader.load(
+			modelPath,
+			(gltf) => {
+				model = gltf.scene;
+				
+				// Calculer la taille et centrer
+				const box = new THREE.Box3().setFromObject(model);
+				const size = box.getSize(new THREE.Vector3());
+				const center = box.getCenter(new THREE.Vector3());
+				
+				// Normaliser la taille
+				const maxDim = Math.max(size.x, size.y, size.z);
+				const scale = 2 / maxDim;
+				model.scale.setScalar(scale);
+				
+				// Centrer
+				model.position.sub(center.multiplyScalar(scale));
+				
+				scene.add(model);
+			},
+			undefined,
+			(error) => console.error('Erreur chargement preview:', error)
+		);
+
+		// Animation
+		let animationId: number;
+		function animate() {
+			animationId = requestAnimationFrame(animate);
+			if (model) {
+				model.rotation.y += 0.01;
+			}
+			renderer.render(scene, camera);
+		}
+		animate();
+
+		return () => {
+			cancelAnimationFrame(animationId);
+			renderer.dispose();
+			if (model) {
+				scene.remove(model);
+			}
+		};
+	}, [modelPath]);
+
+	return <canvas ref={canvasRef} width={200} height={200} />;
+}
 
 export default function App() {
 	const mountRef = useRef(null);
@@ -47,21 +129,22 @@ export default function App() {
 	const [status, setStatus] = useState("idle");
 	const [helpOpen, setHelpOpen] = useState(false);
 	const [isARSupported, setIsARSupported] = useState(false);
+	const [modalOpen, setModalOpen] = useState(false);
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
-	function createMuseumObject(callback: (group: THREE.Group) => void) {
+	function createMuseumObject(modelPath: string, modelScale: number, callback: (group: THREE.Group) => void) {
 		const group = new THREE.Group();
 		group.userData.draggable = true;
 
 		// Charger le modèle GLTF
 		if (gltfLoaderRef.current) {
 			gltfLoaderRef.current.load(
-				'/models/nefertitis/scene.gltf',
+				modelPath,
 				(gltf: any) => {
 					const model = gltf.scene;
 					
 					// Ajuster la taille du modèle AVANT de calculer la bounding box
-					model.scale.set(1, 1, 1);
+					model.scale.set(modelScale, modelScale, modelScale);
 					model.updateMatrixWorld(true);
 					
 					// Calculer la bounding box après le scaling
@@ -347,20 +430,8 @@ export default function App() {
 				
 				if (!reticle.visible) return;
 
-				// Placer un objet au niveau du reticle
-				createMuseumObject((newObject) => {
-					// Extraire seulement la position du reticle (pas toute la matrice)
-					const reticlePosition = new THREE.Vector3();
-					reticlePosition.setFromMatrixPosition(reticle.matrix);
-					
-					// Placer l'objet à cette position exacte
-					newObject.position.copy(reticlePosition);
-					newObject.matrixAutoUpdate = true;
-					
-					scene.add(newObject);
-					placedObjectsRef.current.push(newObject);
-					console.log("Objet placé:", placedObjectsRef.current.length);
-				});
+				// Ouvrir le modal de sélection
+				setModalOpen(true);
 			}
 
 			function onTouchStart(event: TouchEvent) {
@@ -559,6 +630,36 @@ export default function App() {
 		}
 	}
 
+	// Placer le modèle sélectionné
+	function placeSelectedModel(modelPath: string, modelScale: number) {
+		const reticle = reticleRef.current;
+		const scene = sceneRef.current;
+		
+		if (!reticle || !scene || !reticle.visible) return;
+
+		// Placer un objet au niveau du reticle
+		createMuseumObject(modelPath, modelScale, (newObject) => {
+			// Extraire seulement la position du reticle (pas toute la matrice)
+			const reticlePosition = new THREE.Vector3();
+			reticlePosition.setFromMatrixPosition(reticle.matrix);
+			
+			// Placer l'objet à cette position exacte
+			newObject.position.copy(reticlePosition);
+			newObject.matrixAutoUpdate = true;
+			
+			scene.add(newObject);
+			placedObjectsRef.current.push(newObject);
+			console.log("Objet placé:", placedObjectsRef.current.length);
+		});
+
+		// Fermer le modal et bloquer temporairement le placement
+		setModalOpen(false);
+		blockPlacementRef.current = true;
+		setTimeout(() => {
+			blockPlacementRef.current = false;
+		}, 300);
+	}
+
 	// Reset scene: remove placed objects & markers
 	function handleReset(event?: any) {
 		// Empêcher la propagation pour éviter de déclencher un placement
@@ -696,6 +797,47 @@ export default function App() {
 					</ul>
 				</div>
 			)}
+
+			{/* Modal de sélection de modèle */}
+			<Modal
+				title="Choisir un modèle"
+				open={modalOpen}
+				onCancel={() => {
+					setModalOpen(false);
+					blockPlacementRef.current = true;
+					setTimeout(() => {
+						blockPlacementRef.current = false;
+					}, 300);
+				}}
+				footer={null}
+				width={800}
+				style={{ top: 20 }}
+			>
+				<Row gutter={[16, 16]}>
+					{AVAILABLE_MODELS.map((model) => (
+						<Col key={model.id} xs={12} sm={12} md={6}>
+							<Card
+								hoverable
+								onClick={() => placeSelectedModel(model.path, model.scale)}
+								style={{ textAlign: 'center' }}
+								cover={
+									<div style={{ 
+										height: 200, 
+										display: 'flex', 
+										alignItems: 'center', 
+										justifyContent: 'center',
+										background: '#f0f0f0'
+									}}>
+										<ModelPreview modelPath={model.path} />
+									</div>
+								}
+							>
+								<Card.Meta title={model.name} />
+							</Card>
+						</Col>
+					))}
+				</Row>
+			</Modal>
 		</div>
 	);
 }

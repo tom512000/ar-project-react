@@ -47,6 +47,13 @@ Ce projet React utilise Three.js et React Three Fiber pour afficher des modèles
 - Pointez la caméra vers une surface plane pour voir le modèle 3D en réalité augmentée.
 - Interagissez avec le modèle 3D en utilisant les contrôles tactiles (zoom, rotation, déplacement).
 
+### Scanner QR
+- Appuyez sur le bouton `QR Mode` pour activer le scanner QR (utilise la caméra arrière).
+- Quand un QR est détecté, une fenêtre modale s'ouvre et affiche le contenu :
+	- Si le QR renvoie une URL (commençant par `http`), le contenu est affiché dans une `iframe` intégrée.
+	- Sinon, le texte scanné est affiché directement.
+- Le scanner fonctionne en dehors d'une session WebXR immersive (il utilise `getUserMedia`).
+
 ## Modèles 3D
 Les modèles 3D sont situés dans le répertoire `public/models`. Vous pouvez remplacer les fichiers `.gltf` par vos propres modèles pour personnaliser l'expérience AR.
 

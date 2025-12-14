@@ -1,11 +1,3 @@
-:root {
-  --egypt-gold: #c79a2d;
-  --egypt-blue: #0b6fa4;
-  --egypt-sand: #f3e7cf;
-}
-
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -34,21 +26,6 @@ html, body, #root {
   box-shadow: 0 8px 24px rgba(2,6,8,0.6);
 }
 
-/* Parchment procedural background using layered gradients + subtle SVG noise */
-.parchment-bg {
-  background-color: #f3e7cf;
-  background-image:
-    radial-gradient(ellipse at 10% 10%, rgba(199,154,45,0.08) 0%, transparent 25%),
-    radial-gradient(ellipse at 90% 85%, rgba(11,111,164,0.04) 0%, transparent 25%),
-    linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(0,0,0,0.03) 100%),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.06' fill='%23a67c52'/></svg>");
-  background-blend-mode: multiply, overlay, normal, overlay;
-  background-size: cover, cover, cover, 600px 600px;
-  background-position: center, center, center, 0 0;
-  color: #111827;
-  font-family: Cinzel, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-}
-
-.font-museum {
+.font-museum { 
   font-family: "DM Sans", sans-serif;
 }

@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Modal, Card, Row, Col } from "antd";
+import { Modal, Card, Row, Col, Button, Tag } from "antd";
+import {
+	ArrowRightOutlined,
+	CheckCircleOutlined,
+	CloseCircleOutlined,
+	QuestionCircleOutlined,
+	ReloadOutlined,
+	SyncOutlined,
+} from '@ant-design/icons';
+import LogoImage from "/public/images/logo.png";
 
 // AR-Museum-Experience
 // Single-file React component that sets up a simple AR experience with three.js + WebXR.
@@ -58,20 +67,20 @@ function ModelPreview({ modelPath }: { modelPath: string }) {
 			modelPath,
 			(gltf) => {
 				model = gltf.scene;
-				
+
 				// Calculer la taille et centrer
 				const box = new THREE.Box3().setFromObject(model);
 				const size = box.getSize(new THREE.Vector3());
 				const center = box.getCenter(new THREE.Vector3());
-				
+
 				// Normaliser la taille
 				const maxDim = Math.max(size.x, size.y, size.z);
 				const scale = 2 / maxDim;
 				model.scale.setScalar(scale);
-				
+
 				// Centrer
 				model.position.sub(center.multiplyScalar(scale));
-				
+
 				scene.add(model);
 			},
 			undefined,
@@ -117,7 +126,8 @@ export default function App() {
 	const gltfLoaderRef: any = useRef(null);
 	const blockPlacementRef: any = useRef(false);
 	const defaultModelRef: any = useRef(AVAILABLE_MODELS[0]);
-	
+	const [isArStarted, setIsArStarted] = useState(false);
+
 	// Gestion des interactions tactiles
 	const touchStateRef: any = useRef({
 		isTouching: false,
@@ -151,16 +161,16 @@ export default function App() {
 				modelPath,
 				(gltf: any) => {
 					const model = gltf.scene;
-					
+
 					// Ajuster la taille du modèle AVANT de calculer la bounding box
 					model.scale.set(modelScale, modelScale, modelScale);
 					model.updateMatrixWorld(true);
-					
+
 					// Calculer la bounding box après le scaling
 					const box = new THREE.Box3().setFromObject(model);
 					const center = box.getCenter(new THREE.Vector3());
 					// const size = box.getSize(new THREE.Vector3());
-					
+
 					// Repositionner le modèle pour que sa base soit à Y=0
 					// et qu'il soit centré en X et Z
 					model.position.set(
@@ -168,7 +178,7 @@ export default function App() {
 						-box.min.y,  // Aligner la base du modèle à Y=0
 						-center.z
 					);
-					
+
 					// Ajouter au groupe
 					group.add(model);
 					callback(group);
@@ -185,20 +195,20 @@ export default function App() {
 				}
 			);
 		}
-		
+
 		return group;
 	}
 
 	// Créer un objet contextuel pour l'image tracking
 	function createContextualContent() {
 		const group = new THREE.Group();
-		
+
 		// Panneau d'information
 		const panelGeo = new THREE.PlaneGeometry(0.3, 0.2);
-		const panelMat = new THREE.MeshStandardMaterial({ 
-			color: 0x00aaff, 
-			opacity: 0.9, 
-			transparent: true 
+		const panelMat = new THREE.MeshStandardMaterial({
+			color: 0x00aaff,
+			opacity: 0.9,
+			transparent: true
 		});
 		const panel = new THREE.Mesh(panelGeo, panelMat);
 		group.add(panel);
@@ -226,7 +236,7 @@ export default function App() {
 		renderer.xr.enabled = true;
 		mount.appendChild(renderer.domElement);
 		rendererRef.current = renderer;
-		
+
 		// Style pour assurer la visibilité du canvas
 		renderer.domElement.style.position = 'absolute';
 		renderer.domElement.style.top = '0';
@@ -326,7 +336,7 @@ export default function App() {
 								const pose = frame.getPose(result.imageSpace, referenceSpace);
 								if (pose) {
 									let trackedObject = trackedImagesRef.current.get(imageIndex);
-									
+
 									if (!trackedObject) {
 										// Créer un nouveau contenu contextuel
 										trackedObject = createContextualContent();
@@ -366,7 +376,7 @@ export default function App() {
 				setIsARSupported(supported);
 				if (supported) {
 					setStatus('ready');
-					
+
 					// Test des types de référence d'espace supportés
 					navigator.xr?.requestSession("immersive-ar").then(session => {
 						["local", "local-floor", "viewer"].forEach(type => {
@@ -400,7 +410,7 @@ export default function App() {
 
 			// Obtenir la référence d'espace
 			try {
-				const refSpace = await session.requestReferenceSpace("local-floor").catch(() => 
+				const refSpace = await session.requestReferenceSpace("local-floor").catch(() =>
 					session.requestReferenceSpace("local")
 				);
 				xrRefSpaceRef.current = refSpace;
@@ -428,7 +438,7 @@ export default function App() {
 
 			// Gestion des événements tactiles pour le placement et la manipulation
 			const canvas = renderer.domElement;
-			
+
 			function onSelect() {
 				// Ne pas placer d'objet si le placement est bloqué
 				if (blockPlacementRef.current) {
@@ -436,7 +446,7 @@ export default function App() {
 					blockPlacementRef.current = false;
 					return;
 				}
-				
+
 				if (!reticle.visible) return;
 
 				// Placer le modèle par défaut
@@ -452,7 +462,7 @@ export default function App() {
 					console.log("UI touché - placement bloqué");
 					return;
 				}
-				
+
 				const touches = Array.from(event.touches);
 				touchStateRef.current.lastTouches = touches;
 				touchStateRef.current.isTouching = true;
@@ -501,10 +511,10 @@ export default function App() {
 					const touch = touches[0];
 					const deltaX = (touch.clientX - touchStateRef.current.touchStart.x) * 0.001;
 					const deltaY = (touch.clientY - touchStateRef.current.touchStart.y) * 0.001;
-					
+
 					touchStateRef.current.selectedObject.position.x += deltaX;
 					touchStateRef.current.selectedObject.position.z += deltaY;
-					
+
 					touchStateRef.current.touchStart = { x: touch.clientX, y: touch.clientY };
 					event.preventDefault();
 				} else if (touches.length === 2 && touchStateRef.current.selectedObject) {
@@ -512,7 +522,7 @@ export default function App() {
 					const dx = touches[1].clientX - touches[0].clientX;
 					const dy = touches[1].clientY - touches[0].clientY;
 					const distance = Math.sqrt(dx * dx + dy * dy);
-					
+
 					if (touchStateRef.current.lastDistance > 0) {
 						const scaleFactor = distance / touchStateRef.current.lastDistance;
 						const newScale = touchStateRef.current.selectedObject.scale.x * scaleFactor;
@@ -559,7 +569,7 @@ export default function App() {
 				xrRefSpaceRef.current = null;
 				setStatus("session-ended");
 				reticle.visible = false;
-				
+
 				// Nettoyer les événements
 				canvas.removeEventListener("touchstart", onTouchStart);
 				canvas.removeEventListener("touchmove", onTouchMove);
@@ -572,7 +582,7 @@ export default function App() {
 		renderer.xr.addEventListener("sessionstart", () => onSessionStart(renderer.xr.getSession()));
 
 		// cleanup on unmount
-			return () => {
+		return () => {
 			window.removeEventListener("resize", onResize);
 			renderer.setAnimationLoop(null);
 			if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -583,6 +593,7 @@ export default function App() {
 	// Démarrer la session AR
 	async function startAR() {
 		if (!rendererRef.current || !navigator.xr) return;
+		setIsArStarted(true);
 
 		try {
 			console.log('Démarrage de la session AR...');
@@ -590,7 +601,7 @@ export default function App() {
 			// Créer une image de référence pour le tracking (exemple avec une URL d'image)
 			// Note: En production, remplacer par une vraie image de référence
 			const trackedImages: any[] = [];
-			
+
 			// Vous pouvez ajouter des images de référence ici
 			// Exemple: créer un bitmap à partir d'une URL
 			const img = await fetch('image.jpg').then(r => r.blob());
@@ -644,7 +655,7 @@ export default function App() {
 	function createPlacedObject(modelPath: string, modelScale: number) {
 		const reticle = reticleRef.current;
 		const scene = sceneRef.current;
-		
+
 		if (!reticle || !scene || !reticle.visible) return;
 
 		// Placer un objet au niveau du reticle
@@ -652,11 +663,11 @@ export default function App() {
 			// Extraire seulement la position du reticle (pas toute la matrice)
 			const reticlePosition = new THREE.Vector3();
 			reticlePosition.setFromMatrixPosition(reticle.matrix);
-			
+
 			// Placer l'objet à cette position exacte
 			newObject.position.copy(reticlePosition);
 			newObject.matrixAutoUpdate = true;
-			
+
 			scene.add(newObject);
 			placedObjectsRef.current.push(newObject);
 			console.log("Objet placé:", placedObjectsRef.current.length);
@@ -689,16 +700,16 @@ export default function App() {
 			event.preventDefault();
 			event.stopPropagation();
 		}
-		
+
 		const scene = sceneRef.current;
 		if (!scene) return;
-		
+
 		// Supprimer les objets placés
 		placedObjectsRef.current.forEach((obj: any) => {
 			scene.remove(obj);
 			if (obj.geometry) obj.geometry.dispose();
 			if (obj.material) {
-				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose()); 
+				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose());
 				else obj.material.dispose();
 			}
 		});
@@ -709,7 +720,7 @@ export default function App() {
 			scene.remove(obj);
 			if (obj.geometry) obj.geometry.dispose();
 			if (obj.material) {
-				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose()); 
+				if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose());
 				else obj.material.dispose();
 			}
 		});
@@ -730,111 +741,113 @@ export default function App() {
 	}
 
 	return (
-		<div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-			<div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+		<div className={`w-screen h-screen overflow-hidden relative ${!isArStarted ? 'bg-[#f3e7cf]' : ''}`}>
+			<div ref={mountRef} className="w-full h-full" />
 
-			{/* Minimal overlay UI */}
-			<div style={{ position: 'absolute', top: 12, left: 12, color: '#fff', fontFamily: 'sans-serif', pointerEvents: 'none' }}>
-				<div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: 8 }}>
-					<div style={{ fontWeight: '700' }}>AR Museum — Statut: {status}</div>
-					<div style={{ fontSize: 12, opacity: 0.9 }}>Aidez: {helpOpen ? 'visible' : 'cachée'}</div>
+			<div className="absolute top-0 left-0 w-full h-14 p-1.5 flex justify-between items-center border border-gray-300 bg-white">
+				<div className="flex items-center gap-2 font-museum">
+					<img src={LogoImage} alt="AR Museum Logo" className="h-10 object-contain" />
+					{status == 'idle' ? (
+						<Tag color="processing" icon={<SyncOutlined />} variant='filled'>
+							Initialisation...
+						</Tag>
+					) : status == 'ready' ? (
+						<Tag color="success" icon={<CheckCircleOutlined />} variant='filled'>
+							Prêt
+						</Tag>
+					) : (
+						<Tag color="error" icon={<CloseCircleOutlined />} variant='filled'>
+							Erreur
+						</Tag>
+					)}
+				</div>
+				<div className="flex items-center gap-2">
+					<Button
+						type="text"
+						icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />}
+						onClick={(e) => { e.stopPropagation(); blockPlacementRef.current = true; setHelpOpen(h => !h); }}
+						onPointerDown={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						onTouchStart={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						className="min-w-[44px] h-[44px] p-0 bg-[#CBB69B] text-white rounded"
+					/>
 				</div>
 			</div>
 
-			<div style={{ position: 'absolute', right: 12, top: 12, pointerEvents: 'auto', zIndex: 1000 }}>
-				<button 
-					onClick={(e) => { 
-						e.stopPropagation(); 
-						blockPlacementRef.current = true;
-						setHelpOpen(h => !h); 
-					}} 
-					onPointerDown={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					onTouchStart={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					style={{ padding: '8px 10px', borderRadius: 8, pointerEvents: 'auto' }}
-				>
-					Aide
-				</button>
-				<button 
-					onClick={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-						setIsSelectingDefault(true);
-						setModalOpen(true);
-					}} 
-					onPointerDown={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					onTouchStart={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}
-				>
-					Modèle: {defaultModel.name}
-				</button>
-				<button 
-					onClick={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-						handleReset();
-					}} 
-					onPointerDown={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					onTouchStart={(e) => {
-						e.stopPropagation();
-						blockPlacementRef.current = true;
-					}}
-					style={{ padding: '8px 10px', borderRadius: 8, marginLeft: 8, pointerEvents: 'auto' }}
-				>
-					Réinitialiser
-				</button>
+			<div className="absolute left-0 top-[55px] w-full flex justify-center items-center p-2 z-[1000] pointer-events-auto">
+				<div className="flex gap-2 bg-white bg-opacity-70 rounded p-2 border border-gray-300">
+					<Button
+						disabled={!isArStarted}
+						onClick={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+							setIsSelectingDefault(true); setModalOpen(true);
+						}}
+						onPointerDown={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						onTouchStart={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						className="bg-transparent border border-[#CBB69B] rounded px-5 py-2 font-museum"
+					>
+						Modèle actuel : {defaultModel.name}
+					</Button>
+					<Button
+						icon={<ReloadOutlined style={{ fontSize: 16 }} />}
+						disabled={!isArStarted}
+						onClick={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+							handleReset();
+						}}
+						onPointerDown={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						onTouchStart={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						className="p-0 bg-[#CBB69B] text-white rounded"
+					/>
+				</div>
 			</div>
 
 			{/* Bouton START AR au centre */}
 			{isARSupported && status === 'ready' && (
 				<div style={{ position: 'absolute', bottom: '20%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', zIndex: 1001 }}>
-					<button 
+					<button
 						onClick={startAR}
-						style={{ 
-							padding: '16px 40px', 
-							fontSize: '18px',
-							fontWeight: 'bold',
-							borderRadius: 12, 
-							background: '#00ffcc',
-							color: '#000',
-							border: 'none',
-							cursor: 'pointer',
-							boxShadow: '0 4px 12px rgba(0,255,204,0.4)'
-						}}
+						className="bg-[#CBB69B] text-white px-6 py-3 rounded-lg text-lg font-semibold shadow-lg hover:bg-[#b99a7f] active:bg-[#a3866b] transition font-museum"
 					>
-						START AR
+						Entrer dans le musée
+						<ArrowRightOutlined style={{ marginLeft: 8 }} />
 					</button>
 				</div>
 			)}
 
 			{!isARSupported && status !== 'idle' && (
-				<div style={{ position: 'absolute', bottom: '20%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 1001, background: 'rgba(255,0,0,0.7)', color: '#fff', padding: '12px 24px', borderRadius: 8 }}>
+				<div style={{ position: 'absolute', bottom: '20%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 1001, background: 'rgba(255,0,0,0.7)', color: '#fff', padding: '12px 24px', borderRadius: 8 }} className="font-museum">
 					AR non supporté sur cet appareil
 				</div>
 			)}
 
 			{helpOpen && (
-				<div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 90, background: 'rgba(0,0,0,0.8)', color: '#fff', padding: 12, borderRadius: 8, maxWidth: 420, pointerEvents: 'none', zIndex: 999 }}>
+				<div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 120, background: 'rgba(0,0,0,0.8)', color: '#fff', padding: 12, borderRadius: 8, minWidth: 320, pointerEvents: 'none', zIndex: 999 }} className="font-museum">
 					<div style={{ fontWeight: 700 }}>Mode d'emploi rapide</div>
 					<ul style={{ fontSize: 13 }}>
-						<li>Autorisez l'accès à la caméra.</li>
-						<li>Visez un sol/table pour détecter une surface (anneau visible).</li>
-						<li>Touchez pour placer l'objet; utilisez un doigt pour déplacer, deux pour agrandir/faire tourner.</li>
-						<li>Visez l'affiche/marqueur pour révéler un contenu contextuel basé sur l'image (si pris en charge).</li>
+						<li>- Autorisez l'accès à la caméra.</li>
+						<li>- Visez un sol/table pour détecter une surface (anneau visible).</li>
+						<li>- Touchez pour placer l'objet; utilisez un doigt pour déplacer, deux pour agrandir/faire tourner.</li>
+						<li>- Visez l'affiche/marqueur pour révéler un contenu contextuel basé sur l'image (si pris en charge).</li>
 					</ul>
 				</div>
 			)}
@@ -843,6 +856,7 @@ export default function App() {
 			<Modal
 				title={isSelectingDefault ? "Choisir le modèle par défaut" : "Choisir un modèle"}
 				open={modalOpen}
+				className="museum-panel text-black rounded-lg"
 				onCancel={() => {
 					setModalOpen(false);
 					setIsSelectingDefault(false);
@@ -861,15 +875,15 @@ export default function App() {
 							<Card
 								hoverable
 								onClick={() => handleModelSelection(model)}
-								style={{ 
+								style={{
 									textAlign: 'center',
 									border: defaultModel.id === model.id && isSelectingDefault ? '2px solid #1890ff' : undefined
 								}}
 								cover={
-									<div style={{ 
-										height: 200, 
-										display: 'flex', 
-										alignItems: 'center', 
+									<div style={{
+										height: 200,
+										display: 'flex',
+										alignItems: 'center',
 										justifyContent: 'center',
 										background: '#f0f0f0'
 									}}>

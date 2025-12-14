@@ -17,7 +17,14 @@ Ce projet React utilise Three.js et React Three Fiber pour afficher des modèles
 	npm install
 	```
 
-4. Construisez le projet :
+4. (Optionnel) Installer TailwindCSS et générer les fichiers de configuration si nécessaire :
+	```bash
+	npm install -D tailwindcss postcss autoprefixer
+	npx tailwindcss init -p
+	```
+
+
+5. Construisez le projet :
 	```bash
 	npm run build
 	```

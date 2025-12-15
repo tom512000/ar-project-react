@@ -856,6 +856,14 @@ export default function App() {
 						<Tag color="error" icon={<CloseCircleOutlined />} variant='filled'>
 							Erreur
 						</Tag>
+					) : status == 'ar-running' ? (
+						<Tag color="success" icon={<CheckCircleOutlined />} variant='filled'>
+							Actif
+						</Tag>
+					) : status == 'reset' ? (
+						<Tag color="default" icon={<ReloadOutlined />} variant='filled'>
+							Réinitialisé
+						</Tag>
 					) : (
 						<Tag color="default" variant='filled'>
 							{status}

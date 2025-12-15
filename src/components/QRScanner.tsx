@@ -123,23 +123,20 @@ export default function QRScanner({ isOpen, onClose, onScan, onPauseAR, onResume
 	return (
 		<>
 			{!isOpen ? null : (
-				<div className="fixed inset-0 z-[9999] pointer-events-none">
-					{/* Vidéo cachée */}
-					<video ref={videoRef} className="hidden" playsInline autoPlay muted />
+				<div className="fixed inset-0 z-[9999] bg-black">
+					{/* Vidéo en plein écran */}
+					<video
+						ref={videoRef}
+						className="absolute inset-0 w-full h-full object-cover"
+						playsInline
+						autoPlay
+						muted
+					/>
 
-					{/* Aperçu */}
-					<div className="absolute top-32 left-4 pointer-events-none">
-						<div className="bg-black bg-opacity-90 p-2 rounded-lg">
-							<div className="text-white text-xs mb-1 font-mono">Aperçu:</div>
-							<canvas
-								ref={canvasRef}
-								className="border-2 border-white rounded"
-								style={{ width: '160px', height: '120px' }}
-							/>
-						</div>
-					</div>
+					{/* Canvas caché pour la détection */}
+					<canvas ref={canvasRef} className="hidden" />
 
-					<div className="absolute top-0 left-0 right-0 p-4 pointer-events-auto">
+					<div className="absolute top-0 left-0 right-0 p-4 pointer-events-auto z-10">
 						<div className="flex items-center justify-between bg-black bg-opacity-90 text-white px-4 py-3 rounded-lg shadow-lg max-w-md mx-auto">
 							<span className="font-museum text-lg">📷 Scanner QR Code</span>
 							<Button
@@ -151,7 +148,7 @@ export default function QRScanner({ isOpen, onClose, onScan, onPauseAR, onResume
 						</div>
 					</div>
 
-					<div className="absolute inset-0 flex items-center justify-center">
+					<div className="absolute inset-0 flex items-center justify-center z-10">
 						{!isScanning && !error && (
 							<div className="text-center p-6 bg-black bg-opacity-80 text-white rounded-lg pointer-events-none">
 								<div className="text-4xl mb-2">⏸️</div>
@@ -183,7 +180,7 @@ export default function QRScanner({ isOpen, onClose, onScan, onPauseAR, onResume
 					</div>
 
 					{isScanning && !error && (
-						<div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none">
+						<div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none z-10">
 							<div className="bg-black bg-opacity-80 text-white px-6 py-3 rounded-lg inline-block shadow-lg">
 								<div className="text-base font-semibold font-museum">📷 Scan actif</div>
 								<div className="text-sm opacity-90 font-museum">Placez le QR code dans le cadre</div>

@@ -357,7 +357,7 @@ export default function App() {
 
 		// Reticle for placement (a ring that sits on detected surfaces)
 		const ringGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
-		const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+		const ringMat = new THREE.MeshBasicMaterial({ color: 0xCBB69B });
 		const reticle = new THREE.Mesh(ringGeo, ringMat);
 		reticle.matrixAutoUpdate = false;
 		reticle.visible = false;
@@ -898,7 +898,7 @@ export default function App() {
 						Modèle actuel : {defaultModel.name}
 					</Button>
 					<Button
-						disabled
+						disabled={!isArStarted}
 						icon={<QrcodeOutlined style={{ fontSize: 16 }} />}
 						onClick={(e) => {
 							e.stopPropagation();

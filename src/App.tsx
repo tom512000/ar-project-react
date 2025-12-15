@@ -13,7 +13,6 @@ import {
 	SyncOutlined,
 } from '@ant-design/icons';
 import LogoImage from "/public/images/logo.png";
-import jsQR from 'jsqr';
 
 // AR-Museum-Experience
 // Single-file React component that sets up a simple AR experience with three.js + WebXR.
@@ -30,6 +29,8 @@ import jsQR from 'jsqr';
 //   enabled, or any browser that supports WebXR AR). For image tracking and light estimation, browser
 //   support is still experimental—feature-detect and fall back.
 // - Bundle with Vite / Create React App. Install three: `npm i three`
+
+import QRScanner from './components/QRScanner';
 
 // Modèles disponibles
 const AVAILABLE_MODELS = [
@@ -130,6 +131,7 @@ export default function App() {
 	const blockPlacementRef: any = useRef(false);
 	const defaultModelRef: any = useRef(AVAILABLE_MODELS[0]);
 	const statsRef: any = useRef(null);
+	const qrScannerActiveRef: any = useRef(false);
 	const [isArStarted, setIsArStarted] = useState(false);
 
 	// Gestion des interactions tactiles
@@ -150,103 +152,19 @@ export default function App() {
 	const [defaultModel, setDefaultModel] = useState(AVAILABLE_MODELS[0]);
 
 	// QR scanner state
-	const [qrMode, setQrMode] = useState(false);
+	const [qrScannerOpen, setQrScannerOpen] = useState(false);
 	const [qrResult, setQrResult] = useState<string | null>(null);
-	const [qrModalOpen, setQrModalOpen] = useState(false);
-	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
-	const scanAnimationRef = useRef<number | null>(null);
+	const [qrContentModalOpen, setQrContentModalOpen] = useState(false);
 
 	// Synchroniser la ref avec le state
 	useEffect(() => {
 		defaultModelRef.current = defaultModel;
 	}, [defaultModel]);
 
-	useEffect(() => {
-		return () => {
-			// cleanup scanner on unmount
-			stopQrScanner();
-		};
-	}, []);
-
-	async function startQrScanner() {
-		if (qrMode) return;
-		setQrMode(true);
-		blockPlacementRef.current = true;
-		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-			let video = videoRef.current;
-			if (!video) {
-				video = document.createElement('video');
-				videoRef.current = video;
-				video.setAttribute('playsinline', 'true');
-				video.style.display = 'none';
-				document.body.appendChild(video);
-			}
-			video.srcObject = stream;
-			await video.play();
-
-			let canvas = scanCanvasRef.current;
-			if (!canvas) {
-				canvas = document.createElement('canvas');
-				scanCanvasRef.current = canvas;
-				canvas.style.display = 'none';
-				document.body.appendChild(canvas);
-			}
-
-			const scan = () => {
-				if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-					scanAnimationRef.current = requestAnimationFrame(scan);
-					return;
-				}
-				const w = video.videoWidth;
-				const h = video.videoHeight;
-				const canvasEl = scanCanvasRef.current!;
-				canvasEl.width = w;
-				canvasEl.height = h;
-				const ctx = canvasEl.getContext('2d');
-				if (!ctx) return;
-				ctx.drawImage(video, 0, 0, w, h);
-				const imageData = ctx.getImageData(0, 0, w, h);
-				const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-				if (code) {
-					setQrResult(code.data);
-					setQrModalOpen(true);
-					stopQrScanner();
-					return;
-				}
-				scanAnimationRef.current = requestAnimationFrame(scan);
-			};
-			scanAnimationRef.current = requestAnimationFrame(scan);
-		} catch (err) {
-			console.error('QR scanner error:', err);
-			setQrMode(false);
-			blockPlacementRef.current = false;
-		}
-	}
-
-	function stopQrScanner() {
-		setQrMode(false);
-		blockPlacementRef.current = false;
-		if (scanAnimationRef.current) {
-			cancelAnimationFrame(scanAnimationRef.current);
-			scanAnimationRef.current = null;
-		}
-		if (videoRef.current) {
-			const v = videoRef.current;
-			const stream = v.srcObject as MediaStream | null;
-			if (stream) {
-				stream.getTracks().forEach(t => t.stop());
-			}
-			v.srcObject = null;
-			if (v.parentNode) v.parentNode.removeChild(v);
-			videoRef.current = null;
-		}
-		if (scanCanvasRef.current) {
-			const c = scanCanvasRef.current;
-			if (c.parentNode) c.parentNode.removeChild(c);
-			scanCanvasRef.current = null;
-		}
+	function handleQrScan(result: string) {
+		console.log('QR Code scanné:', result);
+		setQrResult(result);
+		setQrContentModalOpen(true);
 	}
 
 	// Helper to create a simple 3D object (a museum piece placeholder)
@@ -396,8 +314,8 @@ export default function App() {
 				const session = xrSessionRef.current;
 				const referenceSpace = xrRefSpaceRef.current;
 
-				// Hit-test pour la détection de surface
-				if (hitTestSourceRef.current && referenceSpace) {
+				// Hit-test pour la détection de surface (cacher si scanner QR actif)
+				if (hitTestSourceRef.current && referenceSpace && !qrScannerActiveRef.current) {
 					const hitTestResults = frame.getHitTestResults(hitTestSourceRef.current);
 					if (hitTestResults.length > 0) {
 						const hit = hitTestResults[0];
@@ -409,6 +327,9 @@ export default function App() {
 					} else {
 						reticle.visible = false;
 					}
+				} else if (qrScannerActiveRef.current) {
+					// Forcer le reticle à être invisible pendant le scan QR
+					reticle.visible = false;
 				}
 
 				// Light estimation
@@ -950,7 +871,17 @@ export default function App() {
 						icon={<QrcodeOutlined style={{ fontSize: 16 }} />}
 						onClick={(e) => {
 							e.stopPropagation();
-							if (!qrMode) startQrScanner(); else stopQrScanner();
+							blockPlacementRef.current = true;
+							qrScannerActiveRef.current = true;
+							setQrScannerOpen(true);
+						}}
+						onPointerDown={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
+						}}
+						onTouchStart={(e) => {
+							e.stopPropagation();
+							blockPlacementRef.current = true;
 						}}
 						className="p-0 bg-[#CBB69B] text-white rounded"
 					/>
@@ -1006,18 +937,29 @@ export default function App() {
 				</div>
 			)}
 
-			{/* QR scanning overlay */}
-			{qrMode && (
-				<div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
-					<div className="w-[260px] h-[260px] border-8 border-gray-300/60 rounded-md shadow-inner backdrop-blur-sm pointer-events-none" />
-					<div className="absolute top-4 text-center text-sm text-white font-museum">Point your camera at a QR code</div>
-				</div>
-			)}
+			{/* Composant QR Scanner */}
+			<QRScanner
+				isOpen={qrScannerOpen}
+				onClose={() => {
+					setQrScannerOpen(false);
+					qrScannerActiveRef.current = false;
+					blockPlacementRef.current = true;
+					setTimeout(() => {
+						blockPlacementRef.current = false;
+					}, 300);
+				}}
+				onScan={handleQrScan}
+				renderer={rendererRef.current}
+			/>
 
-			{/* Modal de sélection de modèle */}
+			{/* Modal pour afficher le contenu du QR code */}
 			<Modal
-				open={qrModalOpen}
-				onCancel={() => { setQrModalOpen(false); setQrResult(null); }}
+				title={<span className="font-museum">Contenu QR Code</span>}
+				open={qrContentModalOpen}
+				onCancel={() => {
+					setQrContentModalOpen(false);
+					setQrResult(null);
+				}}
 				footer={null}
 				width={800}
 				className="museum-panel text-black rounded-lg"

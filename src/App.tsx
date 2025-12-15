@@ -7,6 +7,7 @@ import {
 	ArrowRightOutlined,
 	CheckCircleOutlined,
 	CloseCircleOutlined,
+	ExclamationCircleOutlined,
 	QrcodeOutlined,
 	QuestionCircleOutlined,
 	ReloadOutlined,
@@ -156,6 +157,33 @@ export default function App() {
 	const [qrResult, setQrResult] = useState<string | null>(null);
 	const [qrContentModalOpen, setQrContentModalOpen] = useState(false);
 
+	// Fonctions pour gérer la pause/reprise AR
+	const pauseAR = async () => {
+		const session = xrSessionRef.current;
+		if (session) {
+			await session.end();
+			console.log('Session AR arrêtée pour QR scan');
+		}
+	};
+
+	const resumeAR = async () => {
+		if (rendererRef.current && navigator.xr) {
+			try {
+				const sessionInit: any = {
+					requiredFeatures: ["local-floor"],
+					optionalFeatures: ["local", "viewer", "hit-test", "dom-overlay", "light-estimation"],
+					domOverlay: { root: document.body }
+				};
+
+				const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+				await rendererRef.current.xr.setSession(session);
+				console.log('Session AR redémarrée');
+			} catch (err) {
+				console.error('Erreur redémarrage AR:', err);
+			}
+		}
+	};
+
 	// Synchroniser la ref avec le state
 	useEffect(() => {
 		defaultModelRef.current = defaultModel;
@@ -247,7 +275,11 @@ export default function App() {
 		// Initialiser le GLTF Loader
 		gltfLoaderRef.current = new GLTFLoader();
 
-		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+		const renderer = new THREE.WebGLRenderer({
+			antialias: true,
+			alpha: true,
+			preserveDrawingBuffer: true  // IMPORTANT pour capturer le canvas
+		});
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.xr.enabled = true;
@@ -795,7 +827,7 @@ export default function App() {
 	}
 
 	return (
-		<div className={`w-screen h-screen overflow-hidden relative ${!isArStarted ? 'bg-[#f3e7cf]' : ''}`}>
+		<div className={`w-screen h-screen overflow-hidden relative ${!isArStarted && !qrScannerOpen ? 'bg-[#f3e7cf]' : ''}`}>
 			<div ref={mountRef} className="w-full h-full" />
 
 			<div className="absolute top-0 left-0 w-full h-14 p-1.5 flex justify-between items-center border border-gray-300 bg-white">
@@ -820,6 +852,10 @@ export default function App() {
 					) : status == 'reset' ? (
 						<Tag color="default" icon={<ReloadOutlined />} variant='filled'>
 							Réinitialisé
+						</Tag>
+					) : status == 'session-ended' ? (
+						<Tag color="warning" icon={<ExclamationCircleOutlined />} variant='filled'>
+							Session terminée
 						</Tag>
 					) : (
 						<Tag color="default" variant='filled'>
@@ -949,7 +985,8 @@ export default function App() {
 					}, 300);
 				}}
 				onScan={handleQrScan}
-				renderer={rendererRef.current}
+				onPauseAR={pauseAR}
+				onResumeAR={resumeAR}
 			/>
 
 			{/* Modal pour afficher le contenu du QR code */}

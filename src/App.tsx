@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 import { Modal, Card, Row, Col, Button, Tag } from "antd";
 import {
 	ArrowRightOutlined,
@@ -128,6 +129,7 @@ export default function App() {
 	const gltfLoaderRef: any = useRef(null);
 	const blockPlacementRef: any = useRef(false);
 	const defaultModelRef: any = useRef(AVAILABLE_MODELS[0]);
+	const statsRef: any = useRef(null);
 	const [isArStarted, setIsArStarted] = useState(false);
 
 	// Gestion des interactions tactiles
@@ -377,6 +379,11 @@ export default function App() {
 
 		// XR animation loop
 		function render(_timestamp: number, frame: any) {
+			// Mettre à jour les stats
+			if (statsRef.current) {
+				statsRef.current.begin();
+			}
+
 			// simple pulse effect on reticle when visible
 			if (reticle.visible) {
 				const t = clock.getElapsedTime();
@@ -461,6 +468,11 @@ export default function App() {
 			}
 
 			renderer.render(scene, camera);
+
+			// Terminer la mesure des stats
+			if (statsRef.current) {
+				statsRef.current.end();
+			}
 		}
 
 		renderer.setAnimationLoop(render);
@@ -504,6 +516,21 @@ export default function App() {
 			console.log('AR Session started:', session);
 			xrSessionRef.current = session;
 			setStatus("session-started");
+
+			// Initialiser Stats avec style personnalisé
+			const stats = new Stats();
+			stats.showPanel(0); // 0: fps, 1: ms, 2: mb
+			stats.dom.style.position = 'absolute';
+			stats.dom.style.bottom = '10px';
+			stats.dom.style.left = '10px';
+			stats.dom.style.top = 'auto';
+			stats.dom.style.zIndex = '9999';
+			stats.dom.style.opacity = '0.9';
+			stats.dom.style.borderRadius = '8px';
+			stats.dom.style.overflow = 'hidden';
+			stats.dom.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+			document.body.appendChild(stats.dom);
+			statsRef.current = stats;
 
 			// Obtenir la référence d'espace
 			try {
@@ -667,6 +694,12 @@ export default function App() {
 				setStatus("session-ended");
 				reticle.visible = false;
 
+				// Nettoyer Stats
+				if (statsRef.current && statsRef.current.dom.parentNode) {
+					statsRef.current.dom.parentNode.removeChild(statsRef.current.dom);
+					statsRef.current = null;
+				}
+
 				// Nettoyer les événements
 				canvas.removeEventListener("touchstart", onTouchStart);
 				canvas.removeEventListener("touchmove", onTouchMove);
@@ -682,6 +715,9 @@ export default function App() {
 		return () => {
 			window.removeEventListener("resize", onResize);
 			renderer.setAnimationLoop(null);
+			if (statsRef.current && statsRef.current.dom.parentNode) {
+				statsRef.current.dom.parentNode.removeChild(statsRef.current.dom);
+			}
 			if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
 			renderer.dispose();
 		};

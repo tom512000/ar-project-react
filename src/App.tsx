@@ -852,9 +852,13 @@ export default function App() {
 						<Tag color="success" icon={<CheckCircleOutlined />} variant='filled'>
 							Prêt
 						</Tag>
-					) : (
+					) : status == 'error' ? (
 						<Tag color="error" icon={<CloseCircleOutlined />} variant='filled'>
 							Erreur
+						</Tag>
+					) : (
+						<Tag color="default" variant='filled'>
+							{status}
 						</Tag>
 					)}
 				</div>
